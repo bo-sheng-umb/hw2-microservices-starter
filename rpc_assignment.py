@@ -696,7 +696,7 @@ def main():
     import sys
     
     if len(sys.argv) < 2:
-        print("Usage: python grpc_assignment.py [server|demo|test]")
+        print("Usage: python rpc_assignment.py [server|demo|test]")
         print("  server <port> - Start a service instance")
         print("  demo          - Run basic demonstration")
         print("  test          - Run test suite")

@@ -9,7 +9,7 @@ cd hw2-microservices-[yourusername]
 ```
 
 ### 2. Complete the Implementation
-Edit `grpc_assignment.py` and implement all sections marked with:
+Edit `rpc_assignment.py` and implement all sections marked with:
 ```python
 # TODO: STUDENT MUST IMPLEMENT
 ```
@@ -17,19 +17,19 @@ Edit `grpc_assignment.py` and implement all sections marked with:
 ### 3. Test Locally First
 ```bash
 # Terminal 1: Start service instances
-python3 grpc_assignment.py server 9000
+python3 rpc_assignment.py server 9000
 
 # Terminal 2: Start another instance
-python3 grpc_assignment.py server 9001
+python3 rpc_assignment.py server 9001
 
 # Terminal 3: Start third instance
-python3 grpc_assignment.py server 9002
+python3 rpc_assignment.py server 9002
 
 # Terminal 4: Run tests
-python3 grpc_assignment.py test
+python3 rpc_assignment.py test
 
 # Or run demo mode
-python3 grpc_assignment.py demo
+python3 rpc_assignment.py demo
 ```
 
 ## Cloud Deployment
@@ -69,7 +69,7 @@ gcloud compute ssh hw2-instance-0 --zone=us-central1-a
 # In SSH session:
 git clone [your-repo]
 cd [repo-folder]
-python3 grpc_assignment.py server 9000
+python3 rpc_assignment.py server 9000
 ```
 
 #### IMPORTANT: Clean Up After Testing
@@ -90,7 +90,7 @@ gcloud compute instances delete hw2-instance-0 hw2-instance-1 hw2-instance-2 --z
 # On each CloudLab node
 git clone [your-repo]
 cd [repo-folder]
-python3 grpc_assignment.py server 900X  # X = 0, 1, or 2
+python3 rpc_assignment.py server 900X  # X = 0, 1, or 2
 ```
 
 ### Option C: Single GCP Instance (Cheapest)
@@ -109,17 +109,17 @@ gcloud compute ssh hw2-test --zone=us-central1-a
 # In SSH session, run all services
 git clone [your-repo]
 cd [repo-folder]
-python3 grpc_assignment.py server 9000 &
-python3 grpc_assignment.py server 9001 &
-python3 grpc_assignment.py server 9002 &
-python3 grpc_assignment.py test
+python3 rpc_assignment.py server 9000 &
+python3 rpc_assignment.py server 9001 &
+python3 rpc_assignment.py server 9002 &
+python3 rpc_assignment.py test
 ```
 
 ## Submission
 
 ### Save Your Work
 ```bash
-git add grpc_assignment.py
+git add rpc_assignment.py
 git add AI_USAGE.md  # Document your AI tool usage
 git commit -m "Implement [feature name]"
 git push
@@ -204,7 +204,7 @@ kill -9 [PID]
 
 ## Files in This Repository
 
-- `grpc_assignment.py` - Main file you need to complete
+- `rpc_assignment.py` - Main file you need to complete
 - `README.md` - This file
 - `.gitignore` - Git ignore rules
 - `AI_USAGE.md` - Document your AI tool usage (create this)
