@@ -21,6 +21,29 @@ from datetime import datetime, timedelta
 from dataclasses import dataclass
 from typing import List, Dict, Optional, Tuple
 
+
+# ============================================================
+# CONFIGURATION: Edit this section for cloud deployment
+# ============================================================
+
+# For local testing (default):
+SERVICE_INSTANCES = [
+    ('localhost', 9000),
+    ('localhost', 9001),
+    ('localhost', 9002),
+]
+
+# For cloud deployment, uncomment and replace with your GCP instance IPs:
+# SERVICE_INSTANCES = [
+#     ('35.232.123.45', 9000),  # Replace with your instance-0 IP
+#     ('35.232.123.46', 9001),  # Replace with your instance-1 IP  
+#     ('35.232.123.47', 9002),  # Replace with your instance-2 IP
+# ]
+
+# ============================================================
+# End of configuration section
+# ============================================================
+
 # ===================== PROTOCOL DEFINITION =====================
 # DO NOT MODIFY THIS SECTION
 
@@ -718,28 +741,36 @@ def main():
         # Run a demonstration
         print("Starting microservices demo...")
         
-        # Start multiple service instances
+        # Check if we should start local services or connect to remote
+        use_local = all(host == 'localhost' for host, port in SERVICE_INSTANCES)
+        
         instances = []
-        base_port = 9000
-        num_instances = 3
         
-        for i in range(num_instances):
-            instance = ServiceInstance(f"instance_{i}", base_port + i)
-            thread = threading.Thread(target=instance.start, daemon=True)
-            thread.start()
-            instances.append(instance)
-            time.sleep(0.1)
+        if use_local:
+            # Start local service instances
+            print("Starting local service instances...")
+            for i, (host, port) in enumerate(SERVICE_INSTANCES):
+                instance = ServiceInstance(f"instance_{i}", port)
+                thread = threading.Thread(target=instance.start, daemon=True)
+                thread.start()
+                instances.append(instance)
+                time.sleep(0.1)
+            
+            print(f"Started {len(SERVICE_INSTANCES)} local service instances")
+            time.sleep(1)
+        else:
+            # Connect to remote services
+            print(f"Connecting to {len(SERVICE_INSTANCES)} remote service instances:")
+            for host, port in SERVICE_INSTANCES:
+                print(f"  - {host}:{port}")
         
-        print(f"Started {num_instances} service instances")
-        time.sleep(1)
-        
-        # Create load balancer and add instances
+        # Create load balancer and add instances from SERVICE_INSTANCES
         lb = LoadBalancer(LoadBalancingStrategy.ROUND_ROBIN)
-        for i, instance in enumerate(instances):
+        for i, (host, port) in enumerate(SERVICE_INSTANCES):
             info = InstanceInfo(
-                instance_id=instance.instance_id,
-                host="localhost",
-                port=instance.port
+                instance_id=f"instance_{i}",
+                host=host,
+                port=port
             )
             lb.add_instance(info)
         
@@ -756,7 +787,7 @@ def main():
         stats = lb.get_stats()
         print(json.dumps(stats, indent=2))
         
-        # Cleanup
+        # Cleanup local instances if any
         for instance in instances:
             instance.shutdown()
     
@@ -764,18 +795,30 @@ def main():
         # Run full test suite
         print("Running comprehensive test suite...")
         
-        # Start service instances
+        # Check if we should start local services or connect to remote
+        use_local = all(host == 'localhost' for host, port in SERVICE_INSTANCES)
+        
         instances = []
-        base_port = 9100
-        num_instances = 3
         
-        for i in range(num_instances):
-            instance = ServiceInstance(f"test_instance_{i}", base_port + i)
-            thread = threading.Thread(target=instance.start, daemon=True)
-            thread.start()
-            instances.append(instance)
-        
-        time.sleep(1)
+        if use_local:
+            # Start local service instances
+            print("Starting local service instances for testing...")
+            for i, (host, port) in enumerate(SERVICE_INSTANCES):
+                instance = ServiceInstance(f"test_instance_{i}", port)
+                thread = threading.Thread(target=instance.start, daemon=True)
+                thread.start()
+                instances.append(instance)
+                time.sleep(0.1)
+            
+            print(f"Started {len(SERVICE_INSTANCES)} local service instances")
+            time.sleep(1)
+        else:
+            # Connect to remote services
+            print(f"Testing with {len(SERVICE_INSTANCES)} remote service instances:")
+            for host, port in SERVICE_INSTANCES:
+                print(f"  - {host}:{port}")
+            print("Make sure these services are running!")
+            time.sleep(2)
         
         # Test different strategies
         strategies = [
@@ -791,13 +834,13 @@ def main():
             print(f"Testing with {strategy.value} strategy")
             print('='*50)
             
-            # Create load balancer with strategy
+            # Create load balancer with strategy using SERVICE_INSTANCES
             lb = LoadBalancer(strategy)
-            for instance in instances:
+            for i, (host, port) in enumerate(SERVICE_INSTANCES):
                 info = InstanceInfo(
-                    instance_id=instance.instance_id,
-                    host="localhost",
-                    port=instance.port
+                    instance_id=f"instance_{i}",
+                    host=host,
+                    port=port
                 )
                 lb.add_instance(info)
             
@@ -807,9 +850,14 @@ def main():
             # Run tests
             tester.test_basic_functionality(client)
             tester.test_load_balancing(client, 100)
-            tester.test_fault_tolerance(instances, client)
+            
+            # Only run fault tolerance test with local instances
+            if use_local and instances:
+                tester.test_fault_tolerance(instances, client)
+            else:
+                print("\n=== Skipping Fault Tolerance Test (remote instances) ===")
         
-        # Cleanup
+        # Cleanup local instances if any
         for instance in instances:
             instance.shutdown()
         
