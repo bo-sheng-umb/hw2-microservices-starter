@@ -120,7 +120,6 @@ python3 rpc_assignment.py test
 ### Save Your Work
 ```bash
 git add rpc_assignment.py
-git add AI_USAGE.md  # Document your AI tool usage
 git commit -m "Implement [feature name]"
 git push
 ```
@@ -207,12 +206,11 @@ kill -9 [PID]
 - `rpc_assignment.py` - Main file you need to complete
 - `README.md` - This file
 - `.gitignore` - Git ignore rules
-- `AI_USAGE.md` - Document your AI tool usage (create this)
 
 ## Important Dates
 
-- **Assignment Released**: [Date]
-- **Due Date**: [Date] at 11:59 PM
+- **Assignment Released**: 11/06/2025
+- **Due Date**: 12/05/2025 at 11:59 PM
 
 ## Academic Integrity
 
