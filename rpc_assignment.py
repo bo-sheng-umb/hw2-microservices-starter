@@ -53,10 +53,6 @@ class MessageType(Enum):
     RESPONSE = 2
     HEALTH_CHECK = 3
     HEALTH_RESPONSE = 4
-    REGISTER = 5
-    DISCOVER = 6
-    HEARTBEAT = 7
-    METRICS = 8
 
 class StatusCode(Enum):
     """Response status codes"""
@@ -148,9 +144,6 @@ class ServiceInstance:
         
         print(f"Service {self.instance_id} listening on port {self.port}")
         
-        # Start health monitor
-        threading.Thread(target=self._health_monitor, daemon=True).start()
-        
         while self.running:
             try:
                 client_sock, addr = self.socket.accept()
@@ -174,11 +167,13 @@ class ServiceInstance:
             
             if msg_type == MessageType.REQUEST:
                 # TODO: STUDENT MUST IMPLEMENT
-                # 1. Parse request from data dictionary
-                # 2. Check if deadline has passed
-                # 3. Apply fault injection if configured (for testing)
+                # 1. Parse request from data dictionary: request = Request(**data)
+                # 2. Check if deadline has passed: if time.time() > request.deadline
+                # 3. Apply fault injection if configured (for testing):
+                #    - if self.inject_latency > 0: time.sleep(self.inject_latency / 1000.0)
+                #    - if random.random() < self.error_rate: raise error
                 # 4. Perform the calculation using self._calculate()
-                # 5. Create response with appropriate status and result
+                # 5. Create Response object with appropriate status and result
                 # 6. Send response using Protocol.encode_message()
                 
                 # Your code here...
@@ -187,9 +182,9 @@ class ServiceInstance:
             elif msg_type == MessageType.HEALTH_CHECK:
                 # TODO: STUDENT MUST IMPLEMENT
                 # Return health status including:
-                # - healthy: boolean
-                # - current_load: int
-                # - average_latency: float (from self.processing_times)
+                # - healthy: self.healthy
+                # - current_load: self.current_load
+                # - average_latency: calculate from self.processing_times
                 
                 # Your code here...
                 pass
@@ -224,19 +219,6 @@ class ServiceInstance:
         }
         sock.send(Protocol.encode_message(MessageType.RESPONSE, response))
     
-    def _health_monitor(self):
-        """Monitor service health"""
-        # TODO: STUDENT MUST IMPLEMENT
-        # Periodically update self.healthy based on:
-        # - Current load vs max load
-        # - Average processing time
-        # - Error rate
-        
-        while self.running:
-            time.sleep(5)
-            # Your code here...
-            pass
-    
     def shutdown(self):
         """Shutdown service"""
         self.running = False
@@ -250,7 +232,6 @@ class LoadBalancingStrategy(Enum):
     ROUND_ROBIN = "round_robin"
     LEAST_CONNECTIONS = "least_connections"
     RANDOM = "random"
-    # Add more as you implement them
 
 @dataclass
 class InstanceInfo:
@@ -316,7 +297,7 @@ class LoadBalancer:
             if self.strategy == LoadBalancingStrategy.ROUND_ROBIN:
                 # TODO: STUDENT MUST IMPLEMENT
                 # Round-robin: Select next instance in order
-                # Update self.rr_index appropriately
+                # Use self.rr_index and update it (with wraparound)
                 
                 # Your code here...
                 pass
@@ -324,6 +305,7 @@ class LoadBalancer:
             elif self.strategy == LoadBalancingStrategy.LEAST_CONNECTIONS:
                 # TODO: STUDENT MUST IMPLEMENT
                 # Select instance with least active connections
+                # Use instance.active_connections to decide
                 
                 # Your code here...
                 pass
@@ -348,10 +330,10 @@ class LoadBalancer:
         """Update instance statistics after request"""
         # TODO: STUDENT MUST IMPLEMENT
         # Update the instance's statistics:
-        # - active_connections (using connections_delta)
-        # - total_requests
-        # - error_count (if not success)
-        # - avg_latency (running average)
+        # - active_connections (add connections_delta)
+        # - total_requests (increment if this was a request)
+        # - error_count (increment if not success)
+        # - avg_latency (running average: (old_avg * old_count + new_latency) / new_count)
         
         with self.lock:
             if instance_id in self.instances:
@@ -421,7 +403,7 @@ class CircuitBreaker:
         # 2. If OPEN:
         #    - Check if recovery_timeout has passed
         #    - If yes, transition to HALF_OPEN
-        #    - If no, reject request
+        #    - If no, reject request (raise exception)
         # 3. If HALF_OPEN or CLOSED:
         #    - Try to execute function
         #    - Call on_success() if successful
@@ -451,6 +433,7 @@ class CircuitBreaker:
         # - If CLOSED: increment failure count
         #   - If failure_count >= failure_threshold: transition to OPEN
         # - If HALF_OPEN: transition to OPEN immediately
+        # - Record last_failure_time = time.time()
         
         # Your code here...
         pass
@@ -487,11 +470,12 @@ class SmartClient:
         """Send request with retries and circuit breaking"""
         # TODO: STUDENT MUST IMPLEMENT
         # 1. Try up to max_retries times:
-        #    a. Select instance using load balancer
+        #    a. Select instance using load_balancer
         #    b. Get/create circuit breaker for instance
         #    c. Use circuit breaker to call _send_single_request
-        #    d. If successful, update stats and return response
-        #    e. If failed, calculate retry delay and wait
+        #    d. Update load_balancer stats with connections_delta=+1 before, -1 after
+        #    e. If successful, return response
+        #    f. If failed, calculate retry delay and wait
         # 2. If all retries exhausted, raise exception
         
         attempt = 0
@@ -503,7 +487,7 @@ class SmartClient:
     def _send_single_request(self, instance: InstanceInfo, request: Request) -> Response:
         """Send single request to instance"""
         # TODO: STUDENT MUST IMPLEMENT
-        # 1. Create socket and set timeout
+        # 1. Create socket and set timeout (self.timeout)
         # 2. Connect to instance (host, port)
         # 3. Send request using Protocol.encode_message
         # 4. Receive response using Protocol.decode_message
@@ -529,61 +513,6 @@ class SmartClient:
         
         # Your code here...
         pass
-
-# ===================== SERVICE REGISTRY =====================
-
-class ServiceRegistry:
-    """Service discovery and registration - STUDENT MUST IMPLEMENT"""
-    
-    def __init__(self):
-        self.services: Dict[str, List[InstanceInfo]] = defaultdict(list)
-        self.heartbeats: Dict[str, float] = {}
-        self.ttl = 30  # seconds
-        self.lock = threading.Lock()
-        
-        # Start cleanup thread
-        threading.Thread(target=self._cleanup_stale, daemon=True).start()
-    
-    def register(self, service_name: str, instance: InstanceInfo):
-        """Register service instance"""
-        # TODO: STUDENT MUST IMPLEMENT
-        # 1. Add instance to services[service_name] list
-        # 2. Record current time in heartbeats[instance.instance_id]
-        
-        with self.lock:
-            # Your code here...
-            pass
-    
-    def discover(self, service_name: str) -> List[InstanceInfo]:
-        """Discover available service instances"""
-        # TODO: STUDENT MUST IMPLEMENT
-        # Return list of instances for service_name that:
-        # - Have sent heartbeat within TTL
-        
-        with self.lock:
-            # Your code here...
-            pass
-    
-    def heartbeat(self, instance_id: str):
-        """Update instance heartbeat"""
-        # TODO: STUDENT MUST IMPLEMENT
-        # Update heartbeats[instance_id] with current time
-        
-        with self.lock:
-            # Your code here...
-            pass
-    
-    def _cleanup_stale(self):
-        """Remove stale instances that haven't sent heartbeats"""
-        while True:
-            time.sleep(10)
-            with self.lock:
-                # TODO: STUDENT MUST IMPLEMENT
-                # Remove instances where:
-                # current_time - heartbeats[instance_id] > ttl
-                
-                # Your code here...
-                pass
 
 # ===================== TESTING FRAMEWORK =====================
 
@@ -628,9 +557,11 @@ class Tester:
         return passed == len(test_cases)
     
     def test_load_balancing(self, client: SmartClient, num_requests: int = 100):
-        """Test load distribution"""
+        """Test load distribution with sequential and concurrent requests"""
         print(f"\n=== Testing Load Balancing ({num_requests} requests) ===")
         
+        # Part 1: Sequential requests (shows basic distribution)
+        print("Part 1: Sequential requests")
         for i in range(num_requests):
             request = Request(
                 request_id=f"lb_test_{i}",
@@ -651,6 +582,46 @@ class Tester:
         for instance_id, instance_stats in stats['instances'].items():
             print(f"  {instance_id}: {instance_stats['requests']} requests "
                   f"({instance_stats['percentage']:.1f}%)")
+        
+        # Part 2: Concurrent requests (shows least-connections behavior)
+        if client.load_balancer.strategy == LoadBalancingStrategy.LEAST_CONNECTIONS:
+            print("\nPart 2: Concurrent requests (tests least-connections properly)")
+            results_lock = threading.Lock()
+            results = []
+            
+            def send_concurrent_request(i):
+                request = Request(
+                    request_id=f"concurrent_test_{i}",
+                    method="Calculate",
+                    operation="sum",
+                    values=[1, 2, 3],
+                    deadline=time.time() + 10,
+                    metadata={}
+                )
+                try:
+                    response = client.send_request(request)
+                    with results_lock:
+                        results.append(response)
+                except Exception as e:
+                    pass
+            
+            # Send 50 requests concurrently
+            threads = []
+            for i in range(50):
+                thread = threading.Thread(target=send_concurrent_request, args=(i,))
+                thread.start()
+                threads.append(thread)
+                
+                # Small delay to create overlap but not wait for completion
+                if i % 10 == 0:
+                    time.sleep(0.005)
+            
+            # Wait for all to complete
+            for thread in threads:
+                thread.join()
+            
+            print(f"Completed {len(results)} concurrent requests")
+            print("Note: With concurrent load, least-connections should adapt to varying instance speeds")
     
     def test_fault_tolerance(self, instances: List[ServiceInstance], client: SmartClient):
         """Test resilience to failures"""
@@ -707,6 +678,7 @@ class Tester:
         
         elapsed = time.time() - start
         print(f"Time for 10 requests with circuit breaker: {elapsed:.2f}s")
+        print("Note: Circuit breaker should open after threshold failures")
         
         # Reset error rate
         if len(instances) > 0:
@@ -719,10 +691,10 @@ def main():
     import sys
     
     if len(sys.argv) < 2:
-        print("Usage: python rpc_assignment.py [server|demo|test]")
+        print("Usage: python3 rpc_assignment.py [server|demo|test]")
         print("  server <port> - Start a service instance")
         print("  demo          - Run basic demonstration")
-        print("  test          - Run test suite")
+        print("  test          - Run comprehensive test suite")
         sys.exit(1)
     
     mode = sys.argv[1]
